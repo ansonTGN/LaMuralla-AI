@@ -1,0 +1,152 @@
+use async_trait::async_trait;
+use neo4rs::{Graph, query};
+use uuid::Uuid;
+use std::sync::Arc;
+use std::collections::HashSet;
+use crate::domain::{
+    ports::KGRepository, 
+    models::{KnowledgeExtraction, GraphDataResponse, VisNode, VisEdge, HybridContext}, 
+    errors::AppError
+};
+
+pub struct Neo4jRepo {
+    graph: Arc<Graph>,
+}
+
+impl Neo4jRepo {
+    pub fn new(graph: Arc<Graph>) -> Self {
+        Self { graph }
+    }
+}
+
+#[async_trait]
+impl KGRepository for Neo4jRepo {
+    async fn create_indexes(&self, dim: usize) -> Result<(), AppError> {
+        // Índice vectorial
+        let q = format!(
+            "CREATE VECTOR INDEX chunk_embeddings IF NOT EXISTS FOR (c:DocumentChunk) ON (c.embedding) \
+             OPTIONS {{indexConfig: {{ `vector.dimensions`: {}, `vector.similarity_function`: 'cosine' }} }}", 
+            dim
+        );
+        self.graph.run(query(&q)).await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        
+        // Constraint de unicidad
+        self.graph.run(query("CREATE CONSTRAINT entity_name IF NOT EXISTS FOR (e:Entity) REQUIRE e.name IS UNIQUE")).await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+            
+        Ok(())
+    }
+
+    async fn reset_database(&self) -> Result<(), AppError> {
+        self.graph.run(query("MATCH (n) DETACH DELETE n")).await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn save_chunk(&self, id: Uuid, content: &str, embedding: Vec<f32>) -> Result<(), AppError> {
+        let q = query("CREATE (c:DocumentChunk {id: $id, content: $content, embedding: $embedding})")
+            .param("id", id.to_string())
+            .param("content", content)
+            .param("embedding", embedding);
+        
+        self.graph.run(q).await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn save_graph(&self, chunk_id: Uuid, data: KnowledgeExtraction) -> Result<(), AppError> {
+        let mut txn = self.graph.start_txn().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        for entity in &data.entities {
+            let q = query("MERGE (e:Entity {name: $name}) ON CREATE SET e.category = $category")
+                .param("name", entity.name.as_str())
+                .param("category", entity.category.as_str());
+            txn.run(q).await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        }
+
+        for rel in data.relations {
+            let cypher = format!(
+                "MATCH (a:Entity {{name: $source}}), (b:Entity {{name: $target}}) \
+                 MERGE (a)-[:{}]->(b)", 
+                rel.relation_type.replace(" ", "_").to_uppercase() 
+            );
+            let q = query(&cypher)
+                .param("source", rel.source.as_str())
+                .param("target", rel.target.as_str());
+            txn.run(q).await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        }
+
+        let q_link = query("MATCH (c:DocumentChunk {id: $cid}), (e:Entity) \
+                            WHERE e.name IN $names \
+                            MERGE (c)-[:MENTIONS]->(e)");
+        
+        let names: Vec<String> = data.entities.into_iter().map(|e| e.name).collect();
+        txn.run(q_link.param("cid", chunk_id.to_string()).param("names", names)).await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        txn.commit().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn get_full_graph(&self) -> Result<GraphDataResponse, AppError> {
+        let q = query(
+            "MATCH (n:Entity)-[r]->(m:Entity) \
+             RETURN n.name, n.category, type(r), m.name, m.category \
+             LIMIT 1000"
+        );
+        
+        let mut stream = self.graph.execute(q).await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut nodes_vec = Vec::new();
+        let mut edges_vec = Vec::new();
+        let mut unique_nodes = HashSet::new(); 
+
+        while let Ok(Some(row)) = stream.next().await {
+            let n_name: String = row.get("n.name").unwrap_or_else(|_| "Unknown".to_string());
+            let n_cat: String = row.get("n.category").unwrap_or_else(|_| "Concept".to_string());
+            let r_type: String = row.get("type(r)").unwrap_or_else(|_| "RELATED".to_string());
+            let m_name: String = row.get("m.name").unwrap_or_else(|_| "Unknown".to_string());
+            let m_cat: String = row.get("m.category").unwrap_or_else(|_| "Concept".to_string());
+
+            if unique_nodes.insert(n_name.clone()) {
+                nodes_vec.push(VisNode { id: n_name.clone(), label: n_name.clone(), group: n_cat });
+            }
+            if unique_nodes.insert(m_name.clone()) {
+                nodes_vec.push(VisNode { id: m_name.clone(), label: m_name.clone(), group: m_cat });
+            }
+
+            edges_vec.push(VisEdge { from: n_name, to: m_name, label: r_type });
+        }
+
+        Ok(GraphDataResponse { nodes: nodes_vec, edges: edges_vec })
+    }
+
+    // --- IMPLEMENTACIÓN NUEVA: RAG SEMÁNTICO HÍBRIDO ---
+    async fn find_hybrid_context(&self, embedding: Vec<f32>, limit: usize) -> Result<Vec<HybridContext>, AppError> {
+        // Busca Chunks por similitud vectorial Y expande a las Entidades conectadas
+        let q_str = format!(
+            "CALL db.index.vector.queryNodes('chunk_embeddings', {}, $embedding) \
+             YIELD node as chunk, score \
+             MATCH (chunk)-[:MENTIONS]->(e:Entity) \
+             RETURN chunk.id as id, chunk.content as content, collect(DISTINCT e.name) as entities", 
+            limit
+        );
+
+        let q = query(&q_str).param("embedding", embedding);
+        let mut stream = self.graph.execute(q).await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut results = Vec::new();
+        while let Ok(Some(row)) = stream.next().await {
+            let id: String = row.get("id").unwrap_or_else(|_| "unk".to_string());
+            let content: String = row.get("content").unwrap_or_default();
+            let entities: Vec<String> = row.get("entities").unwrap_or_default();
+
+            results.push(HybridContext {
+                chunk_id: id,
+                content,
+                connected_entities: entities,
+            });
+        }
+        
+        Ok(results)
+    }
+}
