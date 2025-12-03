@@ -6,7 +6,7 @@ FROM rust:1-slim-bookworm as builder
 WORKDIR /app
 
 # Instalar dependencias del sistema necesarias para compilar (OpenSSL es clave para reqwest/neo4rs)
-RUN apt-get update && apt-get install -y pkg-config libssl-dev
+RUN apt-get update && apt-get install -y pkg-config libssl-dev curl
 
 # Truco de caché: Copiar solo manifiestos primero para cachear dependencias
 COPY Cargo.toml ./
