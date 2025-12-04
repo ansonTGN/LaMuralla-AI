@@ -2,24 +2,26 @@
 
 {% block content %}
 <style>
-    /* --- Layout Split-Screen --- */
+    /* --- Layout Split-Screen Profesional --- */
     body { overflow: hidden; background: #0f172a; }
     
     .app-container {
         display: flex;
         height: 100vh;
-        padding-top: 50px;
+        padding-top: 50px; /* Espacio para navbar */
     }
 
-    /* PANE IZQUIERDO: GRAFO */
+    /* PANE IZQUIERDO: GRAFO (60%) */
     .pane-graph {
         flex: 6;
         background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
         position: relative;
         border-right: 1px solid #334155;
+        display: flex;
+        flex-direction: column;
     }
 
-    /* PANE DERECHO: INTERACCIÓN */
+    /* PANE DERECHO: INTERACCIÓN (40%) */
     .pane-sidebar {
         flex: 4;
         background: #f8fafc;
@@ -27,8 +29,10 @@
         flex-direction: column;
         box-shadow: -5px 0 25px rgba(0,0,0,0.2);
         z-index: 20;
+        height: 100%; /* Asegurar altura completa */
     }
 
+    /* --- Navbar --- */
     .navbar-glass {
         height: 50px;
         background: #0f172a;
@@ -37,7 +41,7 @@
     }
     .brand-text { font-family: 'Outfit', sans-serif; letter-spacing: -0.5px; }
 
-    /* --- Graph HUD & Filters --- */
+    /* --- Graph HUD --- */
     .graph-hud {
         position: absolute;
         top: 20px; left: 20px;
@@ -53,7 +57,45 @@
         z-index: 10;
         width: 180px;
     }
+
+    /* --- Tabs Styling --- */
+    .nav-tabs-custom .nav-link {
+        border: none;
+        color: #64748b;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 1rem;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+    .nav-tabs-custom .nav-link:hover { color: #334155; background: rgba(0,0,0,0.02); }
+    .nav-tabs-custom .nav-link.active {
+        color: #3b82f6;
+        background: transparent;
+        border-bottom-color: #3b82f6;
+    }
+
+    /* --- SOLUCIÓN VISUAL: Altura y Scroll de Pestañas --- */
+    /* Esto asegura que el contenido no desaparezca al cambiar de pestaña */
+    .tab-content {
+        flex: 1; /* Ocupar todo el espacio restante */
+        overflow: hidden; /* Evitar scroll en el contenedor padre */
+        position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .tab-pane {
+        height: 100%; /* Forzar altura completa */
+        overflow-y: auto; /* Scroll interno en cada pestaña */
+        display: none; /* Bootstrap maneja el display, pero definimos estructura */
+        flex-direction: column;
+    }
     
+    .tab-pane.active {
+        display: flex; /* Flex para permitir que hijos como chat crezcan */
+    }
+
     /* --- Chat UI --- */
     .chat-history {
         flex-grow: 1;
@@ -63,14 +105,10 @@
         scroll-behavior: smooth;
     }
 
-    .message-card {
-        margin-bottom: 1.5rem;
-        animation: fadeIn 0.3s ease-out;
-    }
+    .message-card { margin-bottom: 1.5rem; animation: fadeIn 0.3s ease-out; }
     
     .message-user {
-        background: #3b82f6;
-        color: white;
+        background: #3b82f6; color: white;
         padding: 1rem 1.25rem;
         border-radius: 16px 16px 2px 16px;
         margin-left: 3rem;
@@ -87,75 +125,26 @@
         color: #334155;
     }
 
+    /* Citation Badge */
     .citation-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        display: inline-flex; align-items: center; justify-content: center;
         width: 20px; height: 20px;
-        background: #eff6ff;
-        color: #2563eb;
-        border-radius: 50%;
-        font-size: 10px;
-        font-weight: bold;
-        margin: 0 2px;
-        cursor: pointer;
-        border: 1px solid #bfdbfe;
-        transition: all 0.2s;
-        vertical-align: super;
+        background: #eff6ff; color: #2563eb;
+        border-radius: 50%; font-size: 10px; font-weight: bold;
+        margin: 0 2px; cursor: pointer;
+        border: 1px solid #bfdbfe; transition: all 0.2s; vertical-align: super;
     }
-    .citation-badge:hover {
-        background: #2563eb; color: white; transform: scale(1.2);
-    }
+    .citation-badge:hover { background: #2563eb; color: white; transform: scale(1.2); }
     
-    /* Markdown Styling */
+    /* Markdown Styles */
     .md-content p { margin-bottom: 0.8rem; line-height: 1.6; }
-    .md-content strong { color: #0f172a; font-weight: 700; }
-    .md-content ul, .md-content ol { padding-left: 1.2rem; margin-bottom: 1rem; }
     .md-content pre { 
         background: #1e293b; color: #f8fafc; 
         padding: 1rem; border-radius: 8px; 
-        overflow-x: auto; font-size: 0.85em; 
-        font-family: 'JetBrains Mono', monospace;
-    }
-    .md-content code {
-        background: rgba(0,0,0,0.05);
-        padding: 2px 4px;
-        border-radius: 4px;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.9em;
-        color: #ef4444;
+        overflow-x: auto; font-size: 0.85em; font-family: 'JetBrains Mono', monospace;
     }
 
-    /* Input Area */
-    #userPrompt {
-        background: #ffffff;
-        border: 1px solid #cbd5e1;
-        transition: all 0.2s;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-    }
-    #userPrompt:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-    }
-
-    /* Tabs */
-    .nav-tabs-custom .nav-link {
-        border: none;
-        color: #64748b;
-        font-weight: 600;
-        font-size: 0.9rem;
-        padding: 1rem;
-        border-bottom: 2px solid transparent;
-        transition: color 0.2s;
-    }
-    .nav-tabs-custom .nav-link:hover { color: #334155; }
-    .nav-tabs-custom .nav-link.active {
-        color: #3b82f6;
-        background: transparent;
-        border-bottom-color: #3b82f6;
-    }
-
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 
 <!-- NAVBAR -->
@@ -188,7 +177,6 @@
                 <span class="d-inline-block rounded-circle" style="width:8px; height:8px; background:#ef4444;"></span> Inferencia
             </div>
             
-            <!-- FILTROS AÑADIDOS -->
             <hr class="border-secondary opacity-25 my-2">
             <div class="fw-bold text-xs mb-2 opacity-75">VISIBILIDAD</div>
             <div class="form-check form-switch text-xs mb-1">
@@ -222,17 +210,18 @@
 
     <!-- RIGHT: WORKSTATION -->
     <div class="pane-sidebar">
-        <!-- Tabs -->
+        <!-- Tabs Header -->
         <ul class="nav nav-tabs nav-tabs-custom px-3 bg-white border-bottom" role="tablist">
             <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-chat">Asistente</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ingest">Ingesta</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-details">Detalles</button></li>
         </ul>
 
-        <div class="tab-content flex-grow-1 overflow-hidden d-flex flex-column">
+        <!-- Tabs Content -->
+        <div class="tab-content">
             
             <!-- 1. CHAT TAB -->
-            <div class="tab-pane fade show active h-100 d-flex flex-column" id="tab-chat">
+            <div class="tab-pane fade show active" id="tab-chat">
                 <div id="chatArea" class="chat-history">
                     <div class="message-card message-ai">
                         <div class="d-flex align-items-center gap-2 mb-2 border-bottom pb-2 border-light">
@@ -260,7 +249,7 @@
             </div>
 
             <!-- 2. INGEST TAB -->
-            <div class="tab-pane fade p-4 overflow-auto" id="tab-ingest">
+            <div class="tab-pane fade p-4" id="tab-ingest">
                 <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-database me-2"></i>Nuevo Conocimiento</h6>
                 
                 <div class="card border-0 bg-light mb-3 shadow-sm">
@@ -298,10 +287,13 @@
 
             <!-- 3. DETAILS TAB -->
             <div class="tab-pane fade p-4" id="tab-details">
+                <!-- Placeholder: Se muestra cuando no hay nada seleccionado -->
                 <div id="details-placeholder" class="text-center text-muted mt-5">
                     <i class="fa-solid fa-circle-nodes fs-1 mb-3 opacity-25"></i>
                     <p class="text-sm">Selecciona un nodo o una cita [1] para ver el análisis profundo.</p>
                 </div>
+
+                <!-- Content: Se muestra cuando HAY selección -->
                 <div id="details-content" class="d-none animate__animated animate__fadeIn">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="badge bg-primary rounded-pill shadow-sm" id="detail-type">ENTITY</span>
@@ -326,56 +318,61 @@
 
 {% block scripts %}
 <script>
-    // --- CONFIGURACIÓN VISUAL ---
+    // --- VARIABLES GLOBALES ---
     const COLORS = {
-        entity: '#6366f1',
-        concept: '#f59e0b',
-        doc: '#10b981',
-        inference: '#ef4444',
-        bg: '#0f172a'
+        entity: '#6366f1', concept: '#f59e0b', doc: '#10b981', inference: '#ef4444', bg: '#0f172a'
     };
-
     let network, allNodesData, allEdgesData, originalNodes;
     let currentSources = []; 
 
+    // --- INICIALIZACIÓN ---
     document.addEventListener('DOMContentLoaded', () => { 
         loadGraph(); 
         setupTabListeners(); 
     });
 
-    // --- 0. GESTIÓN DE PESTAÑAS (SOLUCIÓN DEL BUG) ---
+    // --- 0. GESTIÓN ROBUSTA DE PESTAÑAS (CORRECCIÓN COMPLETA) ---
     function setupTabListeners() {
         const triggerTabList = document.querySelectorAll('button[data-bs-toggle="tab"]');
         triggerTabList.forEach(triggerEl => {
             triggerEl.addEventListener('shown.bs.tab', event => {
                 const targetId = event.target.getAttribute('data-bs-target');
                 
-                // 1. Pestaña CHAT: Foco en el input
+                // 1. Pestaña CHAT: Foco y scroll al fondo
                 if (targetId === '#tab-chat') {
-                    setTimeout(() => document.getElementById('userPrompt').focus(), 100);
+                    setTimeout(() => {
+                        document.getElementById('userPrompt').focus();
+                        const chatArea = document.getElementById('chatArea');
+                        chatArea.scrollTop = chatArea.scrollHeight;
+                    }, 50);
                 }
 
-                // 2. Pestaña INGESTA: Foco en el textarea
+                // 2. Pestaña INGESTA: Foco
                 if (targetId === '#tab-ingest') {
-                    setTimeout(() => document.getElementById('ingestContent').focus(), 100);
+                    setTimeout(() => document.getElementById('ingestContent').focus(), 50);
                 }
 
-                // 3. Pestaña DETALLES: Refresco inteligente
+                // 3. Pestaña DETALLES: Refresco de estado (Bugfix: Ventana vacía)
                 if (targetId === '#tab-details') {
-                    // Comprobamos si Vis.js tiene nodos seleccionados internamente
-                    const selectedIds = network ? network.getSelectedNodes() : [];
-                    
-                    if (selectedIds.length > 0) {
-                        // Si hay selección, forzamos la vista de detalles del primer nodo seleccionado
-                        showNodeDetails(selectedIds[0], false); // false = no intentar cambiar pestaña (ya estamos ahí)
-                    } else {
-                        // Si no hay nada seleccionado, mostramos el placeholder
-                        document.getElementById('details-placeholder').classList.remove('d-none');
-                        document.getElementById('details-content').classList.add('d-none');
-                    }
+                    refreshDetailsState();
                 }
             });
         });
+    }
+
+    // Función auxiliar para forzar el redibujado de la pestaña Detalles
+    function refreshDetailsState() {
+        // Comprobar si network existe y tiene selección
+        const selectedIds = (network && network.getSelectedNodes()) || [];
+        
+        if (selectedIds.length > 0) {
+            // Si hay selección, forzamos renderizado del nodo (sin cambiar de pestaña, porque ya estamos)
+            renderNodeDetails(selectedIds[0]);
+        } else {
+            // Si no hay selección, mostrar placeholder
+            document.getElementById('details-placeholder').classList.remove('d-none');
+            document.getElementById('details-content').classList.add('d-none');
+        }
     }
 
     // --- 1. MOTOR GRÁFICO (VIS.JS) ---
@@ -409,7 +406,6 @@
                 font: { color: '#94a3b8', size: 9, align: 'middle', strokeWidth: 0, background: 'none' }
             }));
 
-            // Copias para filtrado
             originalNodes = new vis.DataSet(nodes);
             allNodesData = new vis.DataSet(nodes);
             allEdgesData = new vis.DataSet(edges);
@@ -430,12 +426,11 @@
             // Evento Click en Nodo
             network.on("click", params => {
                 if (params.nodes.length > 0) {
-                    showNodeDetails(params.nodes[0], true); // true = cambiar pestaña automáticamente
+                    showNodeDetails(params.nodes[0]); 
                 } else {
-                    // Si clic en vacío y estamos en detalles, limpiar
+                    // Si clic en vacío, refrescar estado si estamos en Detalles
                     if(document.querySelector('#tab-details').classList.contains('active')) {
-                        document.getElementById('details-placeholder').classList.remove('d-none');
-                        document.getElementById('details-content').classList.add('d-none');
+                         refreshDetailsState();
                     }
                 }
             });
@@ -461,7 +456,55 @@
         network.setData({ nodes: filtered, edges: allEdgesData });
     }
 
-    // --- 2. INTERACCIÓN CHAT <-> GRAFO ---
+    // --- 2. GESTIÓN DE DETALLES (SEPARADA) ---
+
+    // Función principal para cambiar pestaña y mostrar datos
+    function showNodeDetails(nodeId) {
+        // 1. Activar pestaña visualmente
+        const tabTrigger = document.querySelector('[data-bs-target="#tab-details"]');
+        const tab = new bootstrap.Tab(tabTrigger);
+        tab.show();
+
+        // 2. Renderizar contenido
+        renderNodeDetails(nodeId);
+    }
+
+    // Función pura de renderizado (se usa al cambiar pestaña y al clicar)
+    function renderNodeDetails(nodeId) {
+        const node = allNodesData.get(nodeId);
+        if(!node) return;
+
+        document.getElementById('details-placeholder').classList.add('d-none');
+        const contentDiv = document.getElementById('details-content');
+        contentDiv.classList.remove('d-none');
+        
+        // Efecto de fade in simple al cambiar contenido
+        contentDiv.classList.remove('animate__fadeIn');
+        void contentDiv.offsetWidth; // Trigger reflow
+        contentDiv.classList.add('animate__fadeIn');
+        
+        document.getElementById('detail-type').innerText = node.group.toUpperCase();
+        document.getElementById('detail-type').className = node.group === 'Concept' ? "badge bg-warning text-dark rounded-pill" : "badge bg-primary rounded-pill";
+        document.getElementById('detail-title').innerText = node.title || node.label;
+        document.getElementById('detail-text').innerText = "Entidad nodo en el Grafo de Conocimiento.";
+        
+        const connectedEdges = allEdgesData.get({ filter: e => e.from === nodeId || e.to === nodeId });
+        const ul = document.getElementById('detail-connections');
+        
+        if (connectedEdges.length === 0) {
+             ul.innerHTML = '<li class="text-xs text-muted fst-italic py-2">Sin conexiones directas visibles.</li>';
+        } else {
+            ul.innerHTML = connectedEdges.map(e => {
+                const neighbor = e.from === nodeId ? e.to : e.from;
+                return `<li class="list-group-item px-0 py-1 d-flex justify-content-between border-bottom border-light">
+                            <span><i class="fa-solid fa-circle-nodes text-xs me-2 text-primary"></i>${neighbor}</span>
+                            <span class="text-xs text-muted bg-light px-2 py-0 rounded border">${e.label}</span>
+                        </li>`;
+            }).join('');
+        }
+    }
+
+    // --- 3. INTERACCIÓN CHAT <-> GRAFO ---
     
     function highlightSource(index) {
         const source = currentSources.find(s => s.index === index);
@@ -483,7 +526,7 @@
         // Animación Zoom y Selección Interna
         if(conceptIds.length > 0) {
             network.fit({ nodes: conceptIds, animation: { duration: 500 } });
-            network.selectNodes(conceptIds); // Sincroniza estado para que al ir a Detalles funcione
+            network.selectNodes(conceptIds); 
         }
 
         showSourceDetails(source);
@@ -521,42 +564,7 @@
         ).join('');
     }
 
-    // Modificada para aceptar parámetro 'switchTab'
-    function showNodeDetails(nodeId, switchTab = true) {
-        const node = allNodesData.get(nodeId);
-        if(!node) return;
-
-        if (switchTab) {
-            const tabTrigger = document.querySelector('[data-bs-target="#tab-details"]');
-            const tab = new bootstrap.Tab(tabTrigger);
-            tab.show();
-        }
-        
-        document.getElementById('details-placeholder').classList.add('d-none');
-        document.getElementById('details-content').classList.remove('d-none');
-        
-        document.getElementById('detail-type').innerText = node.group.toUpperCase();
-        document.getElementById('detail-type').className = node.group === 'Concept' ? "badge bg-warning text-dark rounded-pill" : "badge bg-primary rounded-pill";
-        document.getElementById('detail-title').innerText = node.title || node.label;
-        document.getElementById('detail-text').innerText = "Entidad nodo en el Grafo de Conocimiento.";
-        
-        const connectedEdges = allEdgesData.get({ filter: e => e.from === nodeId || e.to === nodeId });
-        const ul = document.getElementById('detail-connections');
-        
-        if (connectedEdges.length === 0) {
-             ul.innerHTML = '<li class="text-xs text-muted fst-italic py-2">Sin conexiones directas visibles.</li>';
-        } else {
-            ul.innerHTML = connectedEdges.map(e => {
-                const neighbor = e.from === nodeId ? e.to : e.from;
-                return `<li class="list-group-item px-0 py-1 d-flex justify-content-between border-bottom border-light">
-                            <span><i class="fa-solid fa-circle-nodes text-xs me-2 text-primary"></i>${neighbor}</span>
-                            <span class="text-xs text-muted bg-light px-2 py-0 rounded border">${e.label}</span>
-                        </li>`;
-            }).join('');
-        }
-    }
-
-    // --- 3. CHAT LOGIC ---
+    // --- 4. CHAT LOGIC ---
     function handleEnter(e) { 
         if(e.key === 'Enter' && !e.shiftKey) { 
             e.preventDefault(); 
@@ -634,7 +642,7 @@
         area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' });
     }
 
-    // --- 4. UTILS ---
+    // --- 5. UTILS ---
     async function startIngestion() {
         const btn = document.getElementById('btnIngest');
         const logDiv = document.getElementById('progressLog');
