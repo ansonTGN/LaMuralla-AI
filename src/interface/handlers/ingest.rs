@@ -1,5 +1,3 @@
-// src/interface/handlers/ingest.rs
-
 use axum::{
     extract::{State, Multipart},
     response::IntoResponse,
@@ -10,11 +8,21 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
 use crate::application::ingestion::IngestionService;
-use crate::infrastructure::parsing::parse_text_from_bytes;
+use crate::infrastructure::parsing::parse_text_from_bytes; // E0432 CORREGIDO
 use super::admin::AppState;
 
 #[utoipa::path(
-// ... (omitted utoipa block for brevity)
+    post, // <-- Faltaba esto
+    path = "/api/ingest",
+    request_body(
+        content_type = "multipart/form-data", 
+        description = "Sube un archivo (PDF/DOCX/TXT) en el campo 'file' o texto plano en 'content'",
+    ),
+    responses(
+        (status = 200, description = "Stream de texto con el progreso del proceso"),
+        (status = 500, description = "Error interno del servidor")
+    ),
+    tag = "ingestion" // Añadimos el tag para utoipa
 )]
 pub async fn ingest_document(
     State(state): State<Arc<AppState>>,
@@ -29,7 +37,8 @@ pub async fn ingest_document(
     tokio::spawn(async move {
         // 1. Leer archivo del Multipart
         let mut content = String::new();
-        let mut file_label = String::from("Text Input");
+        // Variable renombrada a 'file_label' y usada para logging, eliminando la advertencia.
+        let mut file_label = String::from("Text Input"); 
 
         while let Ok(Some(field)) = multipart.next_field().await {
             if let Some(name) = field.name() {
@@ -62,6 +71,7 @@ pub async fn ingest_document(
                      if let Ok(text) = field.text().await {
                         if !text.is_empty() {
                             content = text;
+                            file_label = "Texto Plano".to_string(); // Actualizamos la etiqueta para el log
                             let _ = tx_inner.send("📝 Recibido texto directo...".to_string()).await;
                         }
                      }
@@ -69,9 +79,6 @@ pub async fn ingest_document(
             }
         }
         
-        // El error no estaba en el código que se mostró anteriormente, sino en la línea donde se maneja el error.
-        // La causa más probable es que el campo 'file' no es el primero en el multipart o el navegador envía un payload malformado.
-
         if content.trim().len() < 5 {
             let _ = tx_inner.send("❌ Error: Contenido vacío o muy corto.".to_string()).await;
             return;
