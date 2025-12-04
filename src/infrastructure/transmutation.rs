@@ -1,4 +1,3 @@
-// FILE: src/infrastructure/transmutation.rs
 use std::io::{Cursor, Read};
 use std::path::Path;
 use anyhow::{Context, Result, anyhow};
@@ -57,17 +56,24 @@ impl DocumentTransmuter {
     }
 
     fn parse_pdf(data: &[u8]) -> Result<String> {
+        // Cargar desde memoria usando lopdf
         let doc = Document::load_mem(data)
             .map_err(|e| anyhow!("Fallo al cargar PDF: {}", e))?;
         
         let mut text = String::new();
-        // Iteramos páginas. Nota: lopdf extrae texto crudo, el orden puede variar si es multi-columna.
+        // Iteramos páginas
         for page_num in doc.get_pages().keys() {
+            // lopdf devuelve Result<String>, manejamos el error con ok() para seguir si falla una pag
             if let Ok(content) = doc.extract_text(&[*page_num]) {
                 text.push_str(&content);
                 text.push_str("\n\n");
             }
         }
+        
+        if text.trim().is_empty() {
+             return Err(anyhow!("El PDF parece vacío o contiene imágenes escaneadas no procesables."));
+        }
+
         Ok(text)
     }
 
@@ -142,11 +148,10 @@ impl DocumentTransmuter {
     }
 
     fn parse_html(data: &[u8]) -> Result<String> {
-        // html2text convierte HTML a texto formateado tipo Markdown (con tablas y enlaces)
         let html_string = String::from_utf8(data.to_vec())
             .context("El HTML no es UTF-8 válido")?;
         
-        // CORRECCIÓN: Manejo del Result devuelto por html2text v0.16.4+
+        // Manejo del Result devuelto por html2text v0.16.4+
         let text = html2text::from_read(html_string.as_bytes(), 80)
             .map_err(|e| anyhow!("Error procesando HTML: {}", e))?;
             
