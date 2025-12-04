@@ -4,6 +4,8 @@ use secrecy::SecretString;
 use utoipa::ToSchema;
 use validator::Validate;
 
+// --- CONFIGURACIÓN (Sin cambios significativos) ---
+
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub enum AIProvider {
     OpenAI,
@@ -12,7 +14,6 @@ pub enum AIProvider {
 }
 
 fn default_api_key() -> SecretString {
-    // CORRECCIÓN: Añadido .into() para convertir String a Box<str>
     SecretString::new("".into())
 }
 
@@ -32,6 +33,8 @@ pub struct AIConfig {
     #[validate(url)]
     pub base_url: Option<String>, 
 }
+
+// --- GRAFO BÁSICO (Sin cambios) ---
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct GraphEntity {
@@ -59,7 +62,7 @@ pub struct IngestionRequest {
     pub metadata: serde_json::Value,
 }
 
-// --- MODELOS DE VISUALIZACIÓN ---
+// --- VISUALIZACIÓN (Sin cambios) ---
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct VisNode {
@@ -81,17 +84,37 @@ pub struct GraphDataResponse {
     pub edges: Vec<VisEdge>,
 }
 
-// --- CHAT RAG ---
+// --- CHAT RAG AVANZADO (MODIFICADO) ---
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ChatRequest {
     pub message: String,
 }
 
+/// Referencia a una fuente documental específica.
+/// Se usa para crear citas interactivas [1] que iluminan el grafo.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct SourceReference {
+    /// Índice visual para la cita (ej: 1, 2, 3)
+    pub index: usize,
+    /// ID interno del chunk
+    pub chunk_id: String,
+    /// Fragmento de texto para mostrar en tooltip/panel
+    pub short_content: String,
+    /// Puntuación de relevancia (0.0 - 1.0)
+    pub relevance: f32,
+    /// Conceptos (nodos) del grafo presentes en este fragmento.
+    /// Clave para la interactividad Visual <-> Texto.
+    pub concepts: Vec<String>,
+}
+
+/// Respuesta estructurada del chat.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ChatResponse {
+    /// Texto generado por el LLM (Markdown)
     pub response: String,
-    pub context_used: Vec<String>,
+    /// Lista de fuentes utilizadas para generar la respuesta
+    pub sources: Vec<SourceReference>,
 }
 
 #[derive(Debug, Clone)]
@@ -101,14 +124,14 @@ pub struct HybridContext {
     pub connected_entities: Vec<String>, 
 }
 
-// --- NUEVO: RAZONAMIENTO E INFERENCIA ---
+// --- RAZONAMIENTO E INFERENCIA ---
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct InferredRelation {
     pub source: String,
     pub target: String,
     pub relation: String,
-    pub reasoning: String, // Explicación de por qué la IA creó esto
+    pub reasoning: String, 
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

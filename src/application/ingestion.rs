@@ -7,9 +7,10 @@ use crate::domain::{
     errors::AppError
 };
 
-// Tamaño máximo aproximado por chunk (en caracteres).
-// 24.000 caracteres son aprox 6.000 tokens (seguro para el límite de 8.192).
-const CHUNK_SIZE: usize = 24_000;
+// Reducir drásticamente para mejorar la precisión vectorial
+// 1500 caracteres ~= 300-400 tokens (Sweet spot para embeddings)
+const CHUNK_SIZE: usize = 1500; 
+const CHUNK_OVERLAP: usize = 200;
 
 pub struct IngestionService {
     repo: Arc<dyn KGRepository>,
@@ -22,29 +23,31 @@ impl IngestionService {
     }
 
     /// Función auxiliar para dividir texto preservando palabras completas
+    // En split_text_into_chunks:
+    // Implementar lógica de ventana deslizante (sliding window)
     fn split_text_into_chunks(&self, text: &str) -> Vec<String> {
         let mut chunks = Vec::new();
-        let mut current_chunk = String::new();
+        let chars: Vec<char> = text.chars().collect();
+        let mut start = 0;
 
-        // Dividimos por espacios para no cortar palabras
-        for word in text.split_inclusive(char::is_whitespace) {
-            if current_chunk.len() + word.len() > CHUNK_SIZE {
-                if !current_chunk.is_empty() {
-                    chunks.push(current_chunk);
-                    current_chunk = String::new();
+        while start < chars.len() {
+            let end = std::cmp::min(start + CHUNK_SIZE, chars.len());
+        
+            // Ajuste para no cortar palabras (buscar espacio hacia atrás)
+            let mut actual_end = end;
+            if actual_end < chars.len() {
+                while actual_end > start && !chars[actual_end].is_whitespace() {
+                    actual_end -= 1;
                 }
             }
-            current_chunk.push_str(word);
-        }
-        if !current_chunk.is_empty() {
-            chunks.push(current_chunk);
-        }
-        
-        // Si el texto era muy corto y no entró al loop
-        if chunks.is_empty() && !text.is_empty() {
-            chunks.push(text.to_string());
-        }
+            if actual_end == start { actual_end = end; } // Fallback si la palabra es gigante
 
+            let chunk_str: String = chars[start..actual_end].iter().collect();
+            chunks.push(chunk_str);
+
+            // Avanzar restando el overlap para mantener contexto
+            start +=  std::cmp::max(1, (actual_end - start).saturating_sub(CHUNK_OVERLAP));
+        }
         chunks
     }
 
