@@ -3,94 +3,250 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LaMuralla AI - Acceso</title>
-    <!-- Bootstrap 5 & Icons -->
+    <title>Acceso | LaMuralla Engine</title>
+    <!-- Bootstrap 5.3 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- Fonts: Outfit (UI) & JetBrains Mono (Tech) -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     
     <style>
+        :root {
+            --bg-dark: #0f172a;       /* Slate 900 */
+            --bg-card: rgba(30, 41, 59, 0.7); /* Slate 800 glass */
+            --primary: #3b82f6;       /* Blue 500 */
+            --text-muted: #94a3b8;    /* Slate 400 */
+            --border-glass: rgba(255,255,255,0.08);
+        }
+
         body { 
             font-family: 'Outfit', sans-serif; 
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); 
+            background: var(--bg-dark); 
             min-height: 100vh; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            color: #f1f5f9;
+            position: relative;
+            overflow: hidden;
+            color: #f8fafc;
         }
-        .card { border-radius: 12px; overflow: hidden; }
-        .hero-section { background-color: #3b82f6; color: white; padding: 40px; }
-        .form-section { background-color: white; padding: 40px; color: #334155; }
-        .logo-text { font-size: 2.5rem; font-weight: 700; }
-        .author-footer { font-size: 0.75rem; color: #94a3b8; margin-top: 20px; text-align: center; }
+
+        /* --- Ambient Background --- */
+        .bg-glow {
+            position: absolute;
+            width: 800px; height: 800px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(15, 23, 42, 0) 70%);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+        
+        /* --- Card Container --- */
+        .login-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--border-glass);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            max-width: 1000px;
+            z-index: 1;
+        }
+
+        /* --- Left Column: Brand --- */
+        .brand-section {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            padding: 3.5rem;
+            color: white;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .brand-pattern {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: radial-gradient(rgba(255,255,255,0.2) 1px, transparent 1px);
+            background-size: 24px 24px;
+            opacity: 0.15;
+        }
+
+        /* --- Right Column: Form --- */
+        .form-section { 
+            padding: 3.5rem; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .form-control {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-glass);
+            color: white;
+            padding: 0.85rem 1rem;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .form-control:focus {
+            background: rgba(15, 23, 42, 0.9);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            color: white;
+        }
+        
+        .input-group-text {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-glass);
+            border-right: none;
+            color: var(--text-muted);
+        }
+
+        /* --- Author & CV Button Styles --- */
+        .author-block {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-glass);
+            text-align: center;
+        }
+
+        .author-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .author-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin-bottom: 1rem;
+            letter-spacing: -0.5px;
+        }
+
+        /* Estilo "Cyber-Pill" para el link del CV */
+        .btn-cv {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0.6rem 1.25rem;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #cbd5e1;
+            font-size: 0.85rem;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-cv:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
+        }
+
+        .btn-cv i { font-size: 0.9em; transition: transform 0.3s; }
+        .btn-cv:hover i { transform: translateX(2px); }
+
     </style>
 </head>
 <body>
 
-<div class="card shadow-lg" style="max-width: 900px; width: 95%;">
-    <div class="row g-0">
-        <!-- Panel de Información -->
-        <div class="col-md-7 hero-section d-flex flex-column justify-content-between">
-            <div>
+<!-- Fondo Ambiental -->
+<div class="bg-glow"></div>
+
+<div class="container d-flex justify-content-center">
+    <div class="login-card row g-0 animate__animated animate__fadeIn">
+        
+        <!-- COLUMNA IZQUIERDA: MARCA -->
+        <div class="col-lg-6 brand-section">
+            <div class="brand-pattern"></div>
+            
+            <div class="position-relative z-1">
                 <div class="d-flex align-items-center gap-3 mb-4">
-                    <i class="fa-solid fa-shield-halved fa-2x"></i>
-                    <h1 class="logo-text">LA MURALLA AI</h1>
+                    <div class="bg-white text-primary rounded-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 52px; height: 52px;">
+                        <i class="fa-solid fa-cube fs-4"></i>
+                    </div>
+                    <span class="fs-4 fw-bold tracking-tight text-white">LaMuralla</span>
                 </div>
-                <h2 class="h4 mb-4 fw-light">Motor de Búsqueda y Generación Aumentada (RAG) Híbrido</h2>
-                <p class="fs-6 fw-light mb-4">
-                    La Muralla combina la **Inteligencia Artificial** con un **Grafo de Conocimiento (Neo4j)** para ofrecerte respuestas contextuales, rastreables y con la máxima precisión sobre tus documentos.
+                <h1 class="display-6 fw-bold mb-3 ls-tight">Cognitive Graph<br>Intelligence.</h1>
+                <p class="lead fw-light opacity-75 fs-6" style="line-height: 1.6;">
+                    Sistema avanzado de recuperación aumentada (RAG) que fusiona vectores semánticos con grafos de conocimiento estructurados.
                 </p>
-                <ul class="list-unstyled">
-                    <li><i class="fa-solid fa-check-circle me-2"></i> **Precisión:** Utiliza la estructura relacional de los datos.</li>
-                    <li><i class="fa-solid fa-check-circle me-2"></i> **Trazabilidad:** Visualiza el grafo de conceptos usado en la respuesta.</li>
-                    <li><i class="fa-solid fa-check-circle me-2"></i> **Exploración:** Conceptos clicables para una inmersión profunda.</li>
-                </ul>
             </div>
-            <div class="mt-4 pt-3 border-top border-white border-opacity-25">
-                <p class="small mb-0 text-center">
-                    **Autor:** Ángel A. Urbina 2025
-                </p>
+            
+            <!-- Tech Stack Pills -->
+            <div class="position-relative z-1 mt-4">
+                <div class="d-flex flex-wrap gap-2 opacity-75">
+                    <span class="badge bg-black bg-opacity-25 border border-white border-opacity-10 fw-normal py-2 px-3"><i class="fa-brands fa-rust me-2"></i>Rust Core</span>
+                    <span class="badge bg-black bg-opacity-25 border border-white border-opacity-10 fw-normal py-2 px-3"><i class="fa-solid fa-circle-nodes me-2"></i>Neo4j</span>
+                    <span class="badge bg-black bg-opacity-25 border border-white border-opacity-10 fw-normal py-2 px-3"><i class="fa-solid fa-brain me-2"></i>LLM Reasoning</span>
+                </div>
             </div>
         </div>
 
-        <!-- Panel de Login -->
-        <div class="col-md-5 form-section d-flex flex-column justify-content-center">
-            <h3 class="fw-bold mb-4 text-center">Acceso al Sistema</h3>
+        <!-- COLUMNA DERECHA: FORMULARIO + AUTOR -->
+        <div class="col-lg-6 form-section">
             
+            <!-- Header Formulario -->
+            <div class="mb-4">
+                <h3 class="fw-bold mb-1 text-white">Bienvenido</h3>
+                <p class="text-muted small">Ingrese sus credenciales para acceder al motor.</p>
+            </div>
+
+            <!-- Alerta de Error -->
             {% if error %}
-            <div class="alert alert-danger small" role="alert">
-                <i class="fa-solid fa-triangle-exclamation me-1"></i> Credenciales incorrectas.
+            <div class="alert alert-danger bg-danger bg-opacity-10 border-danger border-opacity-25 text-danger small mb-4 d-flex align-items-center" role="alert">
+                <i class="fa-solid fa-circle-exclamation me-2"></i> 
+                <div>Acceso denegado. Verifique sus datos.</div>
             </div>
             {% endif %}
 
+            <!-- Formulario -->
             <form method="POST" action="/">
-                <div class="mb-3">
-                    <label for="username" class="form-label fw-bold small">Usuario</label>
+                <div class="mb-4">
+                    <label class="form-label text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 1px;">Usuario</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="fa-solid fa-user"></i></span>
-                        <input type="text" class="form-control" id="username" name="username" required autocomplete="off">
+                        <input type="text" class="form-control" name="username" placeholder="Identificador" required autocomplete="off">
                     </div>
                 </div>
                 <div class="mb-4">
-                    <label for="password" class="form-label fw-bold small">Contraseña</label>
+                    <label class="form-label text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 1px;">Contraseña</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="fa-solid fa-lock"></i></span>
-                        <input type="password" class="form-control" id="password" name="password" required>
+                        <input type="password" class="form-control" name="password" placeholder="••••••••" required>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow">
-                    <i class="fa-solid fa-right-to-bracket me-2"></i> ENTRAR
+                <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow-lg" style="letter-spacing: 0.5px;">
+                    INICIAR SESIÓN <i class="fa-solid fa-arrow-right ms-2 opacity-50"></i>
                 </button>
             </form>
             
-            <div class="author-footer">
-                Credenciales de demostración: pedir al autor.
+            <!-- SECCIÓN DEL AUTOR (Updated) -->
+            <div class="author-block">
+                <div class="author-label">Arquitectura & Desarrollo</div>
+                <div class="author-name">Ángel A. Urbina</div>
+                
+                <a href="https://angelurbinacv.netlify.app/" target="_blank" rel="noopener noreferrer" class="btn-cv">
+                    <i class="fa-regular fa-id-card"></i>
+                    <span>Ver Perfil Profesional</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.7em; margin-left: 4px; opacity: 0.6;"></i>
+                </a>
             </div>
+
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
