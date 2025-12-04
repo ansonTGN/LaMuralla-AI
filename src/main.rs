@@ -1,3 +1,4 @@
+// FILE: src/main.rs
 mod domain;
 mod application;
 mod infrastructure;
@@ -87,7 +88,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         provider,
         model_name,
         embedding_model,
-        api_key: SecretString::new(api_key_str),
+        // CORRECCIÓN 1: Añadido .into()
+        api_key: SecretString::new(api_key_str.into()), 
         embedding_dim,
         base_url,
     };
@@ -121,15 +123,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tera, 
     });
 
-let app = Router::new()
-        // API Docs
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        
+    let app = Router::new()
+        // API Docs (Sintaxis correcta para utoipa 8+/axum 0.8)
+        .merge(
+            SwaggerUi::new("/swagger-ui")
+                .url("/api-docs/openapi.json", ApiDoc::openapi())
+                // CORRECCIÓN 2: Eliminado .axum_router() (ya no es necesario en v9)
+        )
+
         // Endpoints API
         .route("/api/admin/config", post(admin::update_config))
         .route("/api/ingest", post(ingest::ingest_document))
         .route("/api/graph", get(graph::get_graph))
-        .route("/api/graph/concept/{name}", get(graph::get_concept_neighborhood)) // <-- CORREGIDO FINALMENTE
+        .route("/api/graph/concept/{name}", get(graph::get_concept_neighborhood)) 
         .route("/api/chat", post(chat::chat_handler))
         .route("/api/reasoning/run", post(reasoning::run_reasoning))
         

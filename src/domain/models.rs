@@ -1,3 +1,4 @@
+// FILE: src/domain/models.rs
 use serde::{Deserialize, Serialize};
 use secrecy::SecretString;
 use utoipa::ToSchema;
@@ -11,7 +12,8 @@ pub enum AIProvider {
 }
 
 fn default_api_key() -> SecretString {
-    SecretString::new("".to_string())
+    // CORRECCIÓN: Añadido .into() para convertir String a Box<str>
+    SecretString::new("".into())
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema, Clone)]

@@ -1,14 +1,16 @@
 use axum::{
     extract::{State, Multipart},
     response::IntoResponse,
-    body::{Body, Bytes}, // Importamos Bytes para el stream
+    body::{Body, Bytes},
 };
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use tokio_stream::StreamExt; // Dejamos SOLO este trait para evitar conflictos con futures
+use tokio_stream::StreamExt;
+
 use crate::application::ingestion::IngestionService;
-use crate::infrastructure::parsing::parse_text_from_bytes;
+// IMPORTANTE: Usamos el nuevo módulo
+use crate::infrastructure::transmutation::DocumentTransmuter;
 use super::admin::AppState;
 
 #[utoipa::path(
@@ -16,11 +18,11 @@ use super::admin::AppState;
     path = "/api/ingest",
     request_body(
         content_type = "multipart/form-data", 
-        description = "Sube un archivo (PDF/DOCX/TXT) en el campo 'file' o texto plano en 'content'",
+        description = "Sube archivos (PDF, DOCX, XLSX, CSV, HTML, TXT)",
     ),
     responses(
-        (status = 200, description = "Stream de texto con el progreso del proceso"),
-        (status = 500, description = "Error interno del servidor")
+        (status = 200, description = "Stream de progreso"),
+        (status = 500, description = "Error interno")
     )
 )]
 pub async fn ingest_document(
@@ -28,69 +30,67 @@ pub async fn ingest_document(
     mut multipart: Multipart,
 ) -> impl IntoResponse {
 
-    // Creamos un canal para streaming de logs
     let (tx, rx) = mpsc::channel::<String>(10);
     let tx_inner = tx.clone();
 
-    // Lanzamos el proceso en background
     tokio::spawn(async move {
-        // 1. Leer archivo del Multipart
         let mut content = String::new();
         let mut filename = String::from("unknown");
 
         while let Ok(Some(field)) = multipart.next_field().await {
-            if let Some(name) = field.name() {
-                if name == "file" {
-                    filename = field.file_name().unwrap_or("file").to_string();
-                    let _ = tx_inner.send(format!("📂 Leyendo archivo: {}...", filename)).await;
-                    
-                    match field.bytes().await {
-                        Ok(bytes) => {
-                             let _ = tx_inner.send("📄 Parseando contenido...".to_string()).await;
-                             match parse_text_from_bytes(&filename, &bytes) {
-                                Ok(text) => content = text,
-                                Err(e) => {
-                                    let _ = tx_inner.send(format!("❌ Error parseando: {}", e)).await;
-                                    return;
-                                }
-                             }
-                        },
-                        Err(e) => {
-                            let _ = tx_inner.send(format!("❌ Error subida: {}", e)).await;
-                            return;
-                        }
+            let name = field.name().unwrap_or("").to_string();
+
+            if name == "file" {
+                filename = field.file_name().unwrap_or("archivo_desconocido").to_string();
+                let _ = tx_inner.send(format!("📂 Recibido archivo: {}", filename)).await;
+                
+                // Leemos los bytes a memoria (cuidado con archivos >100MB, idealmente streaming)
+                match field.bytes().await {
+                    Ok(bytes) => {
+                         let _ = tx_inner.send("✨ Transmutando formato a texto plano...".to_string()).await;
+                         
+                         // --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
+                         match DocumentTransmuter::transmute(&filename, &bytes) {
+                            Ok(text) => {
+                                content = text;
+                                let _ = tx_inner.send(format!("✅ Transmutación exitosa ({} caracteres).", content.len())).await;
+                            },
+                            Err(e) => {
+                                let _ = tx_inner.send(format!("❌ Error de Transmutación: {}", e)).await;
+                                return; // Detener si falla la conversión
+                            }
+                         }
+                         // --------------------------------
+                    },
+                    Err(e) => {
+                        let _ = tx_inner.send(format!("❌ Error subida: {}", e)).await;
+                        return;
                     }
-                } else if name == "content" {
-                     if let Ok(text) = field.text().await {
-                        if !text.is_empty() {
-                            content = text;
-                            let _ = tx_inner.send("📝 Recibido texto directo...".to_string()).await;
-                        }
-                     }
                 }
+            } else if name == "content" {
+                 if let Ok(text) = field.text().await {
+                    if !text.is_empty() {
+                        content = text;
+                        let _ = tx_inner.send("📝 Usando texto directo...".to_string()).await;
+                    }
+                 }
             }
         }
 
         if content.trim().len() < 5 {
-            let _ = tx_inner.send("❌ Error: Contenido vacío o muy corto.".to_string()).await;
+            let _ = tx_inner.send("❌ Error: Contenido vacío o insuficiente.".to_string()).await;
             return;
         }
 
-        // 2. Iniciar Servicio
+        // Iniciar Servicio de Ingesta (Chunking -> Embedding -> Graph)
         let service = IngestionService::new(state.repo.clone(), state.ai_service.clone());
 
         match service.ingest_with_progress(content, tx_inner.clone()).await {
-            Ok(_) => {
-                let _ = tx_inner.send("DONE".to_string()).await;
-            },
-            Err(e) => {
-                let _ = tx_inner.send(format!("❌ Error Crítico: {}", e)).await;
-            }
+            Ok(_) => { let _ = tx_inner.send("DONE".to_string()).await; },
+            Err(e) => { let _ = tx_inner.send(format!("❌ Error Crítico en Ingesta: {}", e)).await; }
         }
     });
 
-    // Convertimos el Receiver en un Stream compatible con Axum Body
-    // Usamos Bytes::from() para asegurar compatibilidad de tipos
     let stream = ReceiverStream::new(rx).map(|msg| {
         Ok::<_, std::io::Error>(Bytes::from(format!("{}\n", msg))) 
     });
