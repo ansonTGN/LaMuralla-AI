@@ -37,7 +37,7 @@
     }
     .brand-text { font-family: 'Outfit', sans-serif; letter-spacing: -0.5px; }
 
-    /* --- Graph HUD --- */
+    /* --- Graph HUD & Filters --- */
     .graph-hud {
         position: absolute;
         top: 20px; left: 20px;
@@ -54,7 +54,7 @@
         width: 180px;
     }
     
-    /* --- Chat UI Refinada --- */
+    /* --- Chat UI --- */
     .chat-history {
         flex-grow: 1;
         overflow-y: auto;
@@ -79,9 +79,9 @@
 
     .message-ai {
         background: white;
-        border-left: 4px solid #6366f1; /* Accent border */
+        border-left: 4px solid #6366f1;
         padding: 1.5rem;
-        border-radius: 8px; /* Slightly more boxy for documents */
+        border-radius: 8px;
         margin-right: 1rem;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         color: #334155;
@@ -338,26 +338,38 @@
     let network, allNodesData, allEdgesData, originalNodes;
     let currentSources = []; 
 
-    // Inicio
     document.addEventListener('DOMContentLoaded', () => { 
         loadGraph(); 
-        setupTabListeners(); // Corrección del bug de pestañas
+        setupTabListeners(); 
     });
 
-    // --- 0. CORRECCIÓN DE PESTAÑAS ---
+    // --- 0. GESTIÓN DE PESTAÑAS (SOLUCIÓN DEL BUG) ---
     function setupTabListeners() {
         const triggerTabList = document.querySelectorAll('button[data-bs-toggle="tab"]');
         triggerTabList.forEach(triggerEl => {
             triggerEl.addEventListener('shown.bs.tab', event => {
                 const targetId = event.target.getAttribute('data-bs-target');
-                // Si vamos a chat, enfocar
+                
+                // 1. Pestaña CHAT: Foco en el input
                 if (targetId === '#tab-chat') {
                     setTimeout(() => document.getElementById('userPrompt').focus(), 100);
                 }
-                // Si vamos a detalles sin selección, resetear
+
+                // 2. Pestaña INGESTA: Foco en el textarea
+                if (targetId === '#tab-ingest') {
+                    setTimeout(() => document.getElementById('ingestContent').focus(), 100);
+                }
+
+                // 3. Pestaña DETALLES: Refresco inteligente
                 if (targetId === '#tab-details') {
-                    const sel = network ? network.getSelectedNodes() : [];
-                    if(sel.length === 0) {
+                    // Comprobamos si Vis.js tiene nodos seleccionados internamente
+                    const selectedIds = network ? network.getSelectedNodes() : [];
+                    
+                    if (selectedIds.length > 0) {
+                        // Si hay selección, forzamos la vista de detalles del primer nodo seleccionado
+                        showNodeDetails(selectedIds[0], false); // false = no intentar cambiar pestaña (ya estamos ahí)
+                    } else {
+                        // Si no hay nada seleccionado, mostramos el placeholder
                         document.getElementById('details-placeholder').classList.remove('d-none');
                         document.getElementById('details-content').classList.add('d-none');
                     }
@@ -372,10 +384,11 @@
             const res = await fetch('/api/graph');
             const data = await res.json();
             
+            // Transformación de datos
             const nodes = data.nodes.map(n => ({
                 id: n.id,
                 label: n.label.length > 20 ? n.label.substring(0, 18) + '..' : n.label,
-                title: n.label, // Tooltip completo
+                title: n.label, 
                 group: n.group,
                 color: { 
                     background: n.group === 'Concept' ? COLORS.concept : COLORS.entity, 
@@ -396,7 +409,7 @@
                 font: { color: '#94a3b8', size: 9, align: 'middle', strokeWidth: 0, background: 'none' }
             }));
 
-            // Guardar para filtros
+            // Copias para filtrado
             originalNodes = new vis.DataSet(nodes);
             allNodesData = new vis.DataSet(nodes);
             allEdgesData = new vis.DataSet(edges);
@@ -409,16 +422,24 @@
                     solver: 'forceAtlas2Based',
                     stabilization: { iterations: 150 }
                 },
-                interaction: { hover: true, tooltipDelay: 200, zoomView: true }
+                interaction: { hover: true, tooltipDelay: 200, zoomView: true, selectConnectedEdges: false }
             };
 
             network = new vis.Network(container, { nodes: allNodesData, edges: allEdgesData }, options);
             
+            // Evento Click en Nodo
             network.on("click", params => {
-                if (params.nodes.length > 0) showNodeDetails(params.nodes[0]);
+                if (params.nodes.length > 0) {
+                    showNodeDetails(params.nodes[0], true); // true = cambiar pestaña automáticamente
+                } else {
+                    // Si clic en vacío y estamos en detalles, limpiar
+                    if(document.querySelector('#tab-details').classList.contains('active')) {
+                        document.getElementById('details-placeholder').classList.remove('d-none');
+                        document.getElementById('details-content').classList.add('d-none');
+                    }
+                }
             });
             
-            // Aplicar filtros iniciales
             updateFilters();
 
         } catch(e) { console.error("Graph Error", e); }
@@ -437,7 +458,6 @@
             }
         });
         
-        // Actualizar sin redibujar todo bruscamente
         network.setData({ nodes: filtered, edges: allEdgesData });
     }
 
@@ -450,7 +470,7 @@
         const conceptIds = source.concepts;
         const updateArray = [];
         
-        // Efecto de foco: atenuar los demás
+        // Efecto Focus
         allNodesData.forEach(node => {
             if(conceptIds.includes(node.id)) {
                 updateArray.push({ id: node.id, opacity: 1, size: 35, color: { background: '#ef4444', border: '#fff' } });
@@ -460,7 +480,12 @@
         });
         network.body.data.nodes.update(updateArray);
         
-        if(conceptIds.length > 0) network.fit({ nodes: conceptIds, animation: { duration: 500 } });
+        // Animación Zoom y Selección Interna
+        if(conceptIds.length > 0) {
+            network.fit({ nodes: conceptIds, animation: { duration: 500 } });
+            network.selectNodes(conceptIds); // Sincroniza estado para que al ir a Detalles funcione
+        }
+
         showSourceDetails(source);
     }
 
@@ -478,7 +503,8 @@
     }
 
     function showSourceDetails(source) {
-        const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#tab-details"]'));
+        const tabTrigger = document.querySelector('[data-bs-target="#tab-details"]');
+        const tab = new bootstrap.Tab(tabTrigger);
         tab.show();
 
         document.getElementById('details-placeholder').classList.add('d-none');
@@ -495,12 +521,16 @@
         ).join('');
     }
 
-    function showNodeDetails(nodeId) {
+    // Modificada para aceptar parámetro 'switchTab'
+    function showNodeDetails(nodeId, switchTab = true) {
         const node = allNodesData.get(nodeId);
         if(!node) return;
 
-        const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#tab-details"]'));
-        tab.show();
+        if (switchTab) {
+            const tabTrigger = document.querySelector('[data-bs-target="#tab-details"]');
+            const tab = new bootstrap.Tab(tabTrigger);
+            tab.show();
+        }
         
         document.getElementById('details-placeholder').classList.add('d-none');
         document.getElementById('details-content').classList.remove('d-none');
@@ -512,13 +542,18 @@
         
         const connectedEdges = allEdgesData.get({ filter: e => e.from === nodeId || e.to === nodeId });
         const ul = document.getElementById('detail-connections');
-        ul.innerHTML = connectedEdges.map(e => {
-            const neighbor = e.from === nodeId ? e.to : e.from;
-            return `<li class="list-group-item px-0 py-1 d-flex justify-content-between border-bottom border-light">
-                        <span><i class="fa-solid fa-circle-nodes text-xs me-2 text-primary"></i>${neighbor}</span>
-                        <span class="text-xs text-muted bg-light px-2 py-0 rounded border">${e.label}</span>
-                    </li>`;
-        }).join('');
+        
+        if (connectedEdges.length === 0) {
+             ul.innerHTML = '<li class="text-xs text-muted fst-italic py-2">Sin conexiones directas visibles.</li>';
+        } else {
+            ul.innerHTML = connectedEdges.map(e => {
+                const neighbor = e.from === nodeId ? e.to : e.from;
+                return `<li class="list-group-item px-0 py-1 d-flex justify-content-between border-bottom border-light">
+                            <span><i class="fa-solid fa-circle-nodes text-xs me-2 text-primary"></i>${neighbor}</span>
+                            <span class="text-xs text-muted bg-light px-2 py-0 rounded border">${e.label}</span>
+                        </li>`;
+            }).join('');
+        }
     }
 
     // --- 3. CHAT LOGIC ---
@@ -542,7 +577,7 @@
         
         area.insertAdjacentHTML('beforeend', 
             `<div id="${loadingId}" class="message-card message-ai text-muted border-0 shadow-none">
-                <i class="fa-solid fa-circle-notch fa-spin me-2"></i>Consultando red neuronal...
+                <i class="fa-solid fa-circle-notch fa-spin me-2"></i>Analizando vectores y grafo...
              </div>`);
         area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' });
 
@@ -557,14 +592,8 @@
             
             currentSources = data.sources || [];
             
-            // Renderizado Markdown y Badges
-            // 1. Reemplazar citas para protegerlas del parser de Markdown si fuera necesario, 
-            //    o parsear Markdown primero y luego inyectar HTML de citas.
-            //    Estrategia: Parsear MD -> Sanitize -> Inject Badges.
-            
             let html = DOMPurify.sanitize(marked.parse(data.response));
             
-            // Inyectar badges interactivos
             html = html.replace(/\[(\d+)\]/g, (match, p1) => {
                 const idx = parseInt(p1);
                 return `<span class="citation-badge" 
@@ -573,10 +602,11 @@
                             onclick="highlightSource(${idx})">${idx}</span>`;
             });
 
-            appendMsg('ai', html, true); // true indica que ya es HTML procesado
+            appendMsg('ai', html, true);
             
         } catch(e) {
-            document.getElementById(loadingId).remove();
+            const l = document.getElementById(loadingId);
+            if(l) l.remove();
             appendMsg('ai', `<span class="text-danger">Error de comunicación.</span>`, true);
         }
     }
@@ -597,14 +627,14 @@
                 </div>
                 <div class="md-content text-sm">${isHtml ? content : marked.parse(content)}</div>`;
         } else {
-            div.innerText = content; // Usuario en texto plano por seguridad (o usar textContent)
+            div.innerText = content; 
         }
         
         area.appendChild(div);
         area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' });
     }
 
-    // --- 4. UTILS (Ingesta & Reasoning) ---
+    // --- 4. UTILS ---
     async function startIngestion() {
         const btn = document.getElementById('btnIngest');
         const logDiv = document.getElementById('progressLog');
@@ -630,7 +660,6 @@
                 const { done, value } = await reader.read();
                 if(done) break;
                 const chunk = decoder.decode(value);
-                // Simple parsing de líneas
                 chunk.split('\n').forEach(line => {
                     if(line.trim()) logDiv.innerHTML += `<div>${line}</div>`;
                 });
